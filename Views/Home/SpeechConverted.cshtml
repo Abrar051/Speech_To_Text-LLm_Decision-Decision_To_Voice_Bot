@@ -1,0 +1,77 @@
+﻿@{
+    ViewData["Title"] = "Record Voice and Convert to MP3";
+}
+
+<h2>Record Voice and Convert to MP3</h2>
+
+<button id="startBtn">Start Recording</button>
+<button id="stopBtn" disabled>Stop Recording</button>
+
+<p id="status">Status: Idle</p>
+
+<audio id="audioPlayback" controls></audio>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js" integrity="sha512-zSq4Vvm00k8M01OLF/SmwKryVpA7YVXIbEFHU1rvNw3pgH50SjL6O4nDbB65V76YKWmr3rPABOXJ+uz+Z3BEmw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+    let recorder;
+    let audioContext;
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const audioPlayback = document.getElementById('audioPlayback');
+
+    startBtn.onclick = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const input = audioContext.createMediaStreamSource(stream);
+
+            recorder = new Recorder(input, { numChannels: 1 });
+            recorder.record();
+
+            status.textContent = 'Recording...';
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        } catch (err) {
+            alert('Could not start recording: ' + err.message);
+        }
+    };
+
+    stopBtn.onclick = () => {
+        if (!recorder) return;
+
+        recorder.stop();
+        status.textContent = 'Processing...';
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
+
+        recorder.exportWAV((blob) => {
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.wav');
+
+            $.ajax({
+                url: '/Home/UploadWav',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function (data) {
+                    var audioElement = document.getElementById('audioPlayback');
+                    audioElement.src = '/uploads/GroqResponse.mp3';
+                    audioElement.load();
+                    audioElement.play();
+                    status.textContent = data.transcription;
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    status.textContent = 'Upload error: ' + errorThrown;
+                    console.error('Upload error:', textStatus, errorThrown);
+                }
+            });
+        });
+    };
+
+</script>
